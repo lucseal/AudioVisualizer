@@ -6,13 +6,78 @@
     android:layout_height="match_parent"
     tools:context="com.example.sunyao.audiovisualizer.MainActivity">
 
-    <TextView
+    <android.support.constraint.Guideline
+        android:id="@+id/guide_h_50"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hello World!"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_percent=".5" />
+
+    <android.support.constraint.Guideline
+        android:id="@+id/guide_v_80"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent=".8" />
+
+    <com.example.sunyao.audiovisualizer.view.AudioWaveView
+        android:id="@+id/wave_view"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="@id/guide_h_50"
+        app:layout_constraintEnd_toEndOf="@id/guide_v_80"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <com.example.sunyao.audiovisualizer.view.AudioWaveView
+        android:id="@+id/record_wave_view"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="@id/guide_v_80"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/wave_view" />
+
+
+    <Button
+        android:id="@+id/btn_log_buff"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Play"
+        app:layout_constraintStart_toEndOf="@id/guide_v_80"
+        app:layout_constraintTop_toBottomOf="parent" />
+
+    <Button
+        android:id="@+id/btn_record"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Record"
+        app:layout_constraintStart_toEndOf="@id/guide_v_80"
+        app:layout_constraintTop_toTopOf="@id/guide_h_50" />
+
+    <Button
+        android:id="@+id/btn_record_pause"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Pause"
+        app:layout_constraintStart_toStartOf="@id/btn_record"
+        app:layout_constraintTop_toBottomOf="@id/btn_record" />
+
+    <Button
+        android:id="@+id/btn_record_stop"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Stop"
+        app:layout_constraintStart_toStartOf="@id/btn_record"
+        app:layout_constraintTop_toBottomOf="@id/btn_record_pause" />
+
+    <Button
+        android:id="@+id/btn_decode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Decode"
+        app:layout_constraintStart_toStartOf="@id/btn_log_buff"
+        app:layout_constraintTop_toBottomOf="@id/btn_log_buff" />
+
 
 </android.support.constraint.ConstraintLayout>
