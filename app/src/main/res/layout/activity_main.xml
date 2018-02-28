@@ -79,5 +79,13 @@
         app:layout_constraintStart_toStartOf="@id/btn_log_buff"
         app:layout_constraintTop_toBottomOf="@id/btn_log_buff" />
 
+    <Button
+        android:id="@+id/compareWave"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="compare"
+        app:layout_constraintStart_toStartOf="@id/btn_log_buff"
+        app:layout_constraintTop_toBottomOf="@id/btn_decode" />
+
 
 </android.support.constraint.ConstraintLayout>

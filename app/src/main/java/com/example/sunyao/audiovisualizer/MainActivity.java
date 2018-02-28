@@ -15,7 +15,6 @@ import android.media.audiofx.Visualizer;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.Looper;
 import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -49,7 +48,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int PERMISSION_REQUEST_CODE = 0x33;
     private static final int BYTES_HANDLER = 0x01;
 
-    private static final int RATE_IN_HZ = 44100;
+    private static final int RATE_IN_HZ = 48000;
     private static final int AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
     public static final int RECORD_SOURCE = MediaRecorder.AudioSource.MIC;
     public static final int CHANNEL = AudioFormat.CHANNEL_IN_MONO;
@@ -78,6 +77,9 @@ public class MainActivity extends AppCompatActivity {
     @BindView(R.id.btn_decode)
     Button mBtnDecode;
 
+    @BindView(R.id.compareWave)
+    Button mCompareWave;
+
     private int mBuffSize;
 
     MediaPlayer mPlayer;
@@ -105,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
         ButterKnife.bind(this);
 
         initHandler();
-        initDecode();
+//        initDecode();
         initMediaPlayer();
         initView();
     }
@@ -179,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void initDecode() {
         try {
-            AssetFileDescriptor afd = getAssets().openFd("FC_100001.mp3");
+            AssetFileDescriptor afd = getAssets().openFd("12.mp3");
 
             mMediaExtractor = new MediaExtractor();
             mMediaExtractor.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
@@ -187,6 +189,8 @@ public class MainActivity extends AppCompatActivity {
             for (int i = 0; i < mMediaExtractor.getTrackCount(); i++) {
                 MediaFormat format = mMediaExtractor.getTrackFormat(i);
                 String mime = format.getString(MediaFormat.KEY_MIME);
+                int sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE);
+                Log.d(TAG, "initDecode: sample rate " + sampleRate);
                 if (mime.startsWith("audio")) {
                     mMediaExtractor.selectTrack(i);
                     mMediaDecode = MediaCodec.createDecoderByType(mime);
@@ -215,7 +219,7 @@ public class MainActivity extends AppCompatActivity {
         mPlayer.setAudioAttributes(aas);
 
         try {
-            AssetFileDescriptor afd = getAssets().openFd("FC_100001.mp3");
+            AssetFileDescriptor afd = getAssets().openFd("12.mp3");
             mPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
             afd.close();
             mPlayer.prepare();
@@ -246,37 +250,33 @@ public class MainActivity extends AppCompatActivity {
         mVisualizer.setDataCaptureListener(new Visualizer.OnDataCaptureListener() {
             @Override
             public void onWaveFormDataCapture(Visualizer visualizer, byte[] waveform, int samplingRate) {
-                byte[] b = Arrays.copyOf(waveform, waveform.length);
-                short[] shorts = new short[b.length / 2];
-                ByteBuffer.wrap(b)
-                        .order(ByteOrder.LITTLE_ENDIAN)
-                        .asShortBuffer()
-                        .get(shorts);
-                double[] result = AudioDataUtil.normalize(shorts);
-
-                Log.d(TAG, "onWaveFormDataCapture: " + Arrays.toString(result));
-
-                if (mWaveResults != null) {
-                    int originLen = mWaveResults.length;
-                    mWaveResults = Arrays.copyOf(mWaveResults, mWaveResults.length + result.length);
-                    System.arraycopy(result, 0, mWaveResults, originLen, result.length);
-                } else {
-                    mWaveResults = result;
-                }
-                mWaveView.setAudioData(mWaveResults);
-                mWaveView.invalidate();
+                Message message = mHandler.obtainMessage();
+                message.what = BYTES_HANDLER;
+                message.obj = waveform;
+                message.arg1 = WAVE_VIEW;
+                mHandler.sendMessage(message);
+                Log.d(TAG, "onWaveFormDataCapture: sampling rate " + samplingRate);
             }
 
             @Override
             public void onFftDataCapture(Visualizer visualizer, byte[] fft, int samplingRate) {
-                byte[] b = Arrays.copyOf(fft, fft.length);
-                short[] shorts = new short[b.length / 2];
-                ByteBuffer.wrap(b)
-                        .order(ByteOrder.LITTLE_ENDIAN)
-                        .asShortBuffer()
-                        .get(shorts);
-                double[] result = AudioDataUtil.normalize(shorts);
-                Log.d(TAG, "onFftDataCapture: " + Arrays.toString(result));
+
+                byte[] model = new byte[fft.length / 2 + 1];
+                model[0] = (byte) Math.abs(fft[1]);
+                int j = 1;
+
+                for (int i = 2; i < 18;) {
+                    model[j] = (byte) Math.hypot(fft[i], fft[i + 1]);
+                    i += 2;
+                    j++;
+                }
+
+                Message message = mHandler.obtainMessage();
+                message.what = BYTES_HANDLER;
+                message.obj = model;
+                message.arg1 = WAVE_VIEW;
+                mHandler.sendMessage(message);
+                Log.d(TAG, "onWaveFormDataCapture: sampling rate " + samplingRate);
             }
         }, Visualizer.getMaxCaptureRate() / 2, true, false);
 
@@ -350,7 +350,7 @@ public class MainActivity extends AppCompatActivity {
 
 
     @OnClick({R.id.btn_log_buff, R.id.btn_record, R.id.btn_record_pause, R.id.btn_record_stop,
-            R.id.btn_decode})
+            R.id.btn_decode, R.id.compareWave})
     public void onViewClicked(View view) {
         switch (view.getId()) {
             case R.id.btn_log_buff:
@@ -367,10 +367,16 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case R.id.btn_decode:
                 startDecode();
+                break;
+            case R.id.compareWave:
+                compareValue();
+                break;
         }
     }
 
     private void startDecode() {
+        mWaveResults = null;
+        initDecode();
         mMediaDecode.start();
         final ByteBuffer[] inputBuffers = mMediaDecode.getInputBuffers();
         final ByteBuffer[] outputBuffers = mMediaDecode.getOutputBuffers();
@@ -450,14 +456,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startRecord() {
+        mRecordWaveResults = null;
         isRecording = true;
+        isPause = false;
         mBtnRecordPause.setText("Pause");
         mBtnRecordPause.setEnabled(true);
         mBtnRecordStop.setEnabled(true);
 
-        if (mWaveResults != null) {
-            mWaveResults = null;
-        }
+//        if (mWaveResults != null) {
+//            mWaveResults = null;
+//        }
 
         initAudioRecord();
         final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-DD HH:mm:ss", Locale.ENGLISH);
@@ -537,4 +545,27 @@ public class MainActivity extends AppCompatActivity {
         }
 
     }
+
+    /**
+     *
+     */
+    private float compareValue() {
+        int lenW = mWaveResults.length;
+        int lenR = mRecordWaveResults.length;
+        int len = lenW > lenR ? lenR : lenW;
+
+        float a = 0, b = 0, c = 0, pxy = 0;
+        for (int i = 0; i < len; i++) {
+            a = ((float) (mWaveResults[i] * mRecordWaveResults[i]));
+            b = ((float) (mWaveResults[i] * mWaveResults[i]));
+            c = ((float) (mRecordWaveResults[i] * mRecordWaveResults[i]));
+        }
+
+        pxy = (float) (a / Math.sqrt(b * c));
+
+        Log.d(TAG, "compareValue: " + pxy);
+
+        return pxy;
+    }
+
 }
