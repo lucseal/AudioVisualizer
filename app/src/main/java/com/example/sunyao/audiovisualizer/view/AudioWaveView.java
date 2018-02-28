@@ -64,10 +64,10 @@ public class AudioWaveView extends View {
             float stepSize = (float) ((double) mViewWidth / mAudioData.length);
             stepSize = 0.006f;
             Log.d("Wave View: ", "audioDataLen : " + mAudioData.length + "   " + stepSize);
-            for (int i = 1; i < mAudioData.length; i += 1) {
-                if (i % 1 == 0) {
-                    canvas.drawLine((i - 1) * stepSize,
-                            (mViewHeight / 2 - (float) (mAudioData[i - 1] * mViewHeight / 2)),
+            for (int i = 20; i < mAudioData.length; i += 20) {
+                if (i % 20 == 0) {
+                    canvas.drawLine((i - 20) * stepSize,
+                            (mViewHeight / 2 - (float) (mAudioData[i - 20] * mViewHeight / 2)),
                             i * stepSize,
                             (mViewHeight / 2 - (float) (mAudioData[i] * mViewHeight / 2)),
                             mPaint);
