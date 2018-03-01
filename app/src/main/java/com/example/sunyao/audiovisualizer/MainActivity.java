@@ -5,7 +5,9 @@ import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
 import android.media.AudioAttributes;
 import android.media.AudioFormat;
+import android.media.AudioManager;
 import android.media.AudioRecord;
+import android.media.AudioTrack;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
@@ -265,7 +267,7 @@ public class MainActivity extends AppCompatActivity {
                 model[0] = (byte) Math.abs(fft[1]);
                 int j = 1;
 
-                for (int i = 2; i < 18;) {
+                for (int i = 2; i < 18; ) {
                     model[j] = (byte) Math.hypot(fft[i], fft[i + 1]);
                     i += 2;
                     j++;
@@ -381,6 +383,21 @@ public class MainActivity extends AppCompatActivity {
         final ByteBuffer[] inputBuffers = mMediaDecode.getInputBuffers();
         final ByteBuffer[] outputBuffers = mMediaDecode.getOutputBuffers();
         final MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+        final AudioTrack audioTrack = new AudioTrack(
+                new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build(),
+                new AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(48000)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+                        .build(),
+                2048,
+                AudioTrack.MODE_STREAM,
+                AudioManager.AUDIO_SESSION_ID_GENERATE);
+        audioTrack.play();
+
         isDecode = true;
         new Thread(new Runnable() {
             @Override
@@ -416,6 +433,8 @@ public class MainActivity extends AppCompatActivity {
                             outBuffer.get(pcmBytes);
                             outBuffer.clear();
 
+                            audioTrack.write(pcmBytes, 0, pcmBytes.length);
+
                             Message message = mHandler.obtainMessage();
                             message.what = BYTES_HANDLER;
                             message.obj = pcmBytes;
@@ -431,7 +450,8 @@ public class MainActivity extends AppCompatActivity {
 
                     }
                 }
-
+                audioTrack.stop();
+                audioTrack.release();
                 mMediaDecode.release();
             }
         }).start();
