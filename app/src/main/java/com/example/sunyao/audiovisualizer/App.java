@@ -11,7 +11,7 @@ import com.iflytek.cloud.SpeechUtility;
  */
 public class App extends Application {
 
-    // C
+    // C C
 
     @Override
     public void onCreate() {
