@@ -90,7 +90,7 @@
     <EditText
         android:id="@+id/et_evaluate_text"
         android:layout_width="0dp"
-        android:text="The quick brown fox jumps from the lazy dog."
+        android:text="The quick brown fox jumps over the lazy dog."
         app:layout_constraintStart_toStartOf="@id/btn_log_buff"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@id/compareWave"

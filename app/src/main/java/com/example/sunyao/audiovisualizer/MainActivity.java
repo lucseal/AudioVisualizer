@@ -676,7 +676,7 @@ public class MainActivity extends AppCompatActivity {
         mIse.setParameter(SpeechConstant.VAD_BOS, "5000");
         mIse.setParameter(SpeechConstant.VAD_EOS, "1800");
         mIse.setParameter(SpeechConstant.KEY_SPEECH_TIMEOUT, "-1");
-        mIse.setParameter(SpeechConstant.RESULT_LEVEL, "plain");
+        mIse.setParameter(SpeechConstant.RESULT_LEVEL, "complete");
 
         // 设置音频保存路径，保存音频格式支持pcm、wav，设置路径为sd卡请注意WRITE_EXTERNAL_STORAGE权限
         // 注：AUDIO_FORMAT参数语记需要更新版本才能生效
