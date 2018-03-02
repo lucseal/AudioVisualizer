@@ -13,6 +13,8 @@ public class App extends Application {
 
     // A A
 
+    // B B
+
     @Override
     public void onCreate() {
         SpeechUtility.createUtility(App.this, "appid=" + getString(R.string.app_id));
