@@ -11,6 +11,8 @@ import com.iflytek.cloud.SpeechUtility;
  */
 public class App extends Application {
 
+    // D
+
     @Override
     public void onCreate() {
         SpeechUtility.createUtility(App.this, "appid=" + getString(R.string.app_id));
