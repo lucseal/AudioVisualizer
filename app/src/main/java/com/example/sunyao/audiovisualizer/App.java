@@ -10,6 +10,7 @@ import com.iflytek.cloud.SpeechUtility;
  * @date 2018/3/2 上午10:21
  */
 public class App extends Application {
+    // Branch X
 
     @Override
     public void onCreate() {
