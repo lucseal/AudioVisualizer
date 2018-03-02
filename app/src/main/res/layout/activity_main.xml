@@ -87,5 +87,30 @@
         app:layout_constraintStart_toStartOf="@id/btn_log_buff"
         app:layout_constraintTop_toBottomOf="@id/btn_decode" />
 
+    <EditText
+        android:id="@+id/et_evaluate_text"
+        android:layout_width="0dp"
+        android:text="The quick brown fox jumps from the lazy dog."
+        app:layout_constraintStart_toStartOf="@id/btn_log_buff"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/compareWave"
+        app:layout_constraintBottom_toBottomOf="@id/guide_h_50"
+        android:layout_height="0dp" />
+
+    <Button
+        android:id="@+id/btn_xf_eva_start"
+        app:layout_constraintStart_toStartOf="@id/btn_record"
+        app:layout_constraintTop_toBottomOf="@+id/btn_record_stop"
+        android:layout_width="wrap_content"
+        android:text="评测开始"
+        android:layout_height="wrap_content" />
+    <Button
+        android:id="@+id/btn_xf_eva_stop"
+        app:layout_constraintStart_toStartOf="@id/btn_record"
+        app:layout_constraintTop_toBottomOf="@+id/btn_xf_eva_start"
+        android:text="评测结束"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
 
 </android.support.constraint.ConstraintLayout>

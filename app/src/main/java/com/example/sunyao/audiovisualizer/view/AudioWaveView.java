@@ -19,6 +19,7 @@ public class AudioWaveView extends View {
     private Paint mPaint;
     private int mViewHeight;
     private int mViewWidth;
+    private float mStepSize;
 
     public AudioWaveView(Context context) {
         this(context, null);
@@ -39,7 +40,12 @@ public class AudioWaveView extends View {
         this.mAudioData = mAudioData;
     }
 
+    public void setCounts(long count) {
+        mStepSize = mViewWidth / 190000f;
+    }
+
     private void initPaint() {
+        mStepSize = 0.006f;
         mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         mPaint.setStyle(Paint.Style.FILL);
         mPaint.setColor(Color.parseColor("#00897b"));
@@ -63,12 +69,13 @@ public class AudioWaveView extends View {
         if (null != mAudioData) {
             float stepSize = (float) ((double) mViewWidth / mAudioData.length);
             stepSize = 0.006f;
-            Log.d("Wave View: ", "audioDataLen : " + mAudioData.length + "   " + stepSize);
+
+            Log.d("Wave View: ", "audioDataLen : " + mAudioData.length + "   " + mStepSize);
             for (int i = 20; i < mAudioData.length; i += 20) {
                 if (i % 20 == 0) {
-                    canvas.drawLine((i - 20) * stepSize,
+                    canvas.drawLine((i - 20) * mStepSize,
                             (mViewHeight / 2 - (float) (mAudioData[i - 20] * mViewHeight / 2)),
-                            i * stepSize,
+                            i * mStepSize,
                             (mViewHeight / 2 - (float) (mAudioData[i] * mViewHeight / 2)),
                             mPaint);
                 }

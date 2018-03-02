@@ -15,6 +15,7 @@ import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.media.audiofx.Visualizer;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
@@ -22,15 +23,26 @@ import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.Toast;
 
 import com.example.sunyao.audiovisualizer.utils.AudioDataUtil;
 import com.example.sunyao.audiovisualizer.utils.FileUtil;
 import com.example.sunyao.audiovisualizer.view.AudioWaveView;
+import com.iflytek.cloud.ErrorCode;
+import com.iflytek.cloud.EvaluatorListener;
+import com.iflytek.cloud.EvaluatorResult;
+import com.iflytek.cloud.SpeechConstant;
+import com.iflytek.cloud.SpeechError;
+import com.iflytek.cloud.SpeechEvaluator;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -57,6 +69,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int WAVE_VIEW = 0;
     private static final int RECORD_WAVE_VIEW = 1;
+    private Toast mToast;
 
     @BindView(R.id.wave_view)
     AudioWaveView mWaveView;
@@ -82,6 +95,15 @@ public class MainActivity extends AppCompatActivity {
     @BindView(R.id.compareWave)
     Button mCompareWave;
 
+    @BindView(R.id.et_evaluate_text)
+    EditText mEtEva;
+
+    @BindView(R.id.btn_xf_eva_start)
+    Button mBtnEvaStart;
+
+    @BindView(R.id.btn_xf_eva_stop)
+    Button mBtnEvaStop;
+
     private int mBuffSize;
 
     MediaPlayer mPlayer;
@@ -93,6 +115,7 @@ public class MainActivity extends AppCompatActivity {
     private AudioRecord mAudioRecord;
     private MediaCodec mMediaDecode;
     private MediaExtractor mMediaExtractor;
+    private SpeechEvaluator mIse;
 
     private boolean isRecording;
     private boolean isPause;
@@ -100,6 +123,68 @@ public class MainActivity extends AppCompatActivity {
     private boolean isDecode;
 
     private Handler mHandler;
+    private String mLastResult;
+
+    // 评测监听接口
+    private EvaluatorListener mEvaluatorListener = new EvaluatorListener() {
+
+        @Override
+        public void onResult(EvaluatorResult result, boolean isLast) {
+            Log.d(TAG, "evaluator result :" + isLast);
+
+            if (isLast) {
+                StringBuilder builder = new StringBuilder();
+                builder.append(result.getResultString());
+
+                mLastResult = builder.toString();
+                Log.d(TAG, "onResult: " + mLastResult);
+                showTip("评测结束");
+            }
+        }
+
+        @Override
+        public void onError(SpeechError error) {
+            if (error != null) {
+                showTip("error:" + error.getErrorCode() + "," + error.getErrorDescription());
+            } else {
+                Log.d(TAG, "evaluator over");
+            }
+        }
+
+        @Override
+        public void onBeginOfSpeech() {
+            // 此回调表示：sdk内部录音机已经准备好了，用户可以开始语音输入
+            Log.d(TAG, "evaluator begin");
+        }
+
+        @Override
+        public void onEndOfSpeech() {
+            // 此回调表示：检测到了语音的尾端点，已经进入识别过程，不再接受语音输入
+            Log.d(TAG, "evaluator stoped");
+        }
+
+        @Override
+        public void onVolumeChanged(int volume, byte[] data) {
+            showTip("当前音量：" + volume);
+            Log.d(TAG, "返回音频数据：" + data.length);
+            Message message = mHandler.obtainMessage();
+            message.what = BYTES_HANDLER;
+            message.obj = data;
+            message.arg1 = RECORD_WAVE_VIEW;
+            mHandler.sendMessage(message);
+
+        }
+
+        @Override
+        public void onEvent(int eventType, int arg1, int arg2, Bundle obj) {
+            // 以下代码用于获取与云端的会话id，当业务出错时将会话id提供给技术支持人员，可用于查询会话日志，定位出错原因
+            //	if (SpeechEvent.EVENT_SESSION_ID == eventType) {
+            //		String sid = obj.getString(SpeechEvent.KEY_EVENT_SESSION_ID);
+            //		Log.d(TAG, "session id =" + sid);
+            //	}
+        }
+
+    };
 
 
     @Override
@@ -108,10 +193,16 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
 
+        mToast = Toast.makeText(this, "", Toast.LENGTH_LONG);
         initHandler();
 //        initDecode();
         initMediaPlayer();
+        initIse();
         initView();
+    }
+
+    private void initIse() {
+        mIse = SpeechEvaluator.createEvaluator(this, null);
     }
 
     private void initHandler() {
@@ -187,6 +278,9 @@ public class MainActivity extends AppCompatActivity {
 
             mMediaExtractor = new MediaExtractor();
             mMediaExtractor.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+            Log.d(TAG, "initDecode: audio len: " + afd.getLength());
+            mWaveView.setCounts(2);
+            mRecordWaveView.setCounts(2);
 
             for (int i = 0; i < mMediaExtractor.getTrackCount(); i++) {
                 MediaFormat format = mMediaExtractor.getTrackFormat(i);
@@ -299,10 +393,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void permissionCheck() {
-        List<String> permissionList = new ArrayList<>();
-        permissionList.add(Manifest.permission.RECORD_AUDIO);
-        permissionList.add(Manifest.permission.CAMERA);
-        permissionList.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        String[] permissionList = new String[]
+                {Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                        Manifest.permission.LOCATION_HARDWARE,Manifest.permission.READ_PHONE_STATE,
+                        Manifest.permission.WRITE_SETTINGS,Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.RECORD_AUDIO,Manifest.permission.READ_CONTACTS};
+
 
         List<String> checkList = new ArrayList<>();
         for (String s : permissionList) {
@@ -352,7 +448,7 @@ public class MainActivity extends AppCompatActivity {
 
 
     @OnClick({R.id.btn_log_buff, R.id.btn_record, R.id.btn_record_pause, R.id.btn_record_stop,
-            R.id.btn_decode, R.id.compareWave})
+            R.id.btn_decode, R.id.compareWave, R.id.btn_xf_eva_stop, R.id.btn_xf_eva_start})
     public void onViewClicked(View view) {
         switch (view.getId()) {
             case R.id.btn_log_buff:
@@ -373,7 +469,23 @@ public class MainActivity extends AppCompatActivity {
             case R.id.compareWave:
                 compareValue();
                 break;
+            case R.id.btn_xf_eva_start:
+                xfEvaStart();
+                break;
+            case R.id.btn_xf_eva_stop:
+                xfEvaStop();
+                break;
         }
+    }
+
+    private void xfEvaStop() {
+        mIse.stopEvaluating();
+    }
+
+    private void xfEvaStart() {
+        setParams();
+        String evaText = mEtEva.getText().toString();
+        int ref = mIse.startEvaluating(evaText, null, mEvaluatorListener);
     }
 
     private void startDecode() {
@@ -557,6 +669,23 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    private void setParams() {
+        mIse.setParameter(SpeechConstant.LANGUAGE, "en_us");
+        mIse.setParameter(SpeechConstant.ISE_CATEGORY, "read_sentence");
+        mIse.setParameter(SpeechConstant.TEXT_ENCODING, "utf-8");
+        mIse.setParameter(SpeechConstant.VAD_BOS, "5000");
+        mIse.setParameter(SpeechConstant.VAD_EOS, "1800");
+        mIse.setParameter(SpeechConstant.KEY_SPEECH_TIMEOUT, "-1");
+        mIse.setParameter(SpeechConstant.RESULT_LEVEL, "plain");
+
+        // 设置音频保存路径，保存音频格式支持pcm、wav，设置路径为sd卡请注意WRITE_EXTERNAL_STORAGE权限
+        // 注：AUDIO_FORMAT参数语记需要更新版本才能生效
+        mIse.setParameter(SpeechConstant.AUDIO_FORMAT,"wav");
+        mIse.setParameter(SpeechConstant.ISE_AUDIO_PATH, Environment.getExternalStorageDirectory().getAbsolutePath() + "/msc/ise.wav");
+        //通过writeaudio方式直接写入音频时才需要此设置
+//        mIse.setParameter(SpeechConstant.AUDIO_SOURCE,"-1");
+    }
+
     private void saveWavFile(File pcm, File wav) {
         try {
             FileUtil.convertAudioFiles(pcm, wav);
@@ -586,6 +715,13 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "compareValue: " + pxy);
 
         return pxy;
+    }
+
+    private void showTip(String str) {
+        if (!TextUtils.isEmpty(str)) {
+            mToast.setText(str);
+            mToast.show();
+        }
     }
 
 }
