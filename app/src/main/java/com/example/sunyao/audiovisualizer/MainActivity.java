@@ -122,6 +122,8 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean isDecode;
 
+    private boolean decodePause;
+
     private Handler mHandler;
     private String mLastResult;
 
@@ -395,9 +397,9 @@ public class MainActivity extends AppCompatActivity {
     private void permissionCheck() {
         String[] permissionList = new String[]
                 {Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                        Manifest.permission.LOCATION_HARDWARE,Manifest.permission.READ_PHONE_STATE,
-                        Manifest.permission.WRITE_SETTINGS,Manifest.permission.READ_EXTERNAL_STORAGE,
-                        Manifest.permission.RECORD_AUDIO,Manifest.permission.READ_CONTACTS};
+                        Manifest.permission.LOCATION_HARDWARE, Manifest.permission.READ_PHONE_STATE,
+                        Manifest.permission.WRITE_SETTINGS, Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.RECORD_AUDIO, Manifest.permission.READ_CONTACTS};
 
 
         List<String> checkList = new ArrayList<>();
@@ -464,7 +466,16 @@ public class MainActivity extends AppCompatActivity {
                 stopRecord();
                 break;
             case R.id.btn_decode:
-                startDecode();
+                if (isDecode) {
+                    if (decodePause) {
+                        decodePause = false;
+                    } else {
+                        decodePause = true;
+                    }
+                } else {
+                    startDecode();
+                }
+
                 break;
             case R.id.compareWave:
                 compareValue();
@@ -492,8 +503,7 @@ public class MainActivity extends AppCompatActivity {
         mWaveResults = null;
         initDecode();
         mMediaDecode.start();
-        final ByteBuffer[] inputBuffers = mMediaDecode.getInputBuffers();
-        final ByteBuffer[] outputBuffers = mMediaDecode.getOutputBuffers();
+        mMediaDecode.dequeueInputBuffer(5000);
         final MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
         final AudioTrack audioTrack = new AudioTrack(
                 new AudioAttributes.Builder()
@@ -511,56 +521,58 @@ public class MainActivity extends AppCompatActivity {
         audioTrack.play();
 
         isDecode = true;
+        decodePause = false;
         new Thread(new Runnable() {
             @Override
             public void run() {
                 while (isDecode) {
-                    Log.d(TAG, "startDecode: input buffer len: " + inputBuffers.length);
-                    for (int i = 0; i < inputBuffers.length; i++) {
-                        int inputIndex = mMediaDecode.dequeueInputBuffer(-1);
+                    if (decodePause) {
+                        continue;
+                    }
 
-                        if (inputIndex < 0) {
-                            isDecode = false;
-                            return;
-                        }
+                    int inputIndex = mMediaDecode.dequeueInputBuffer(-1);
 
-                        ByteBuffer buffer = inputBuffers[inputIndex];
-                        buffer.clear();
-                        //音轨读取数据到buffer里
-                        int sampleSize = mMediaExtractor.readSampleData(buffer, 0);
+                    if (inputIndex < 0) {
+                        isDecode = false;
+                        return;
+                    }
 
-                        if (sampleSize < 0) {
-                            isDecode = false;
-                        } else {
-                            mMediaDecode.queueInputBuffer(inputIndex, 0, sampleSize, 0, 0);
-                            mMediaExtractor.advance();
-                        }
+                    ByteBuffer buffer = mMediaDecode.getInputBuffer(inputIndex);
+                    buffer.clear();
+                    //音轨读取数据到buffer里
+                    int sampleSize = mMediaExtractor.readSampleData(buffer, 0);
 
-                        int outputIndex = mMediaDecode.dequeueOutputBuffer(bufferInfo, 10 * 1000);
-                        ByteBuffer outBuffer;
-                        byte[] pcmBytes;
-                        while (outputIndex > 0) {
-                            outBuffer = outputBuffers[outputIndex];
-                            pcmBytes = new byte[bufferInfo.size];
-                            outBuffer.get(pcmBytes);
-                            outBuffer.clear();
+                    if (sampleSize < 0) {
+                        isDecode = false;
+                    } else {
+                        mMediaDecode.queueInputBuffer(inputIndex, 0, sampleSize, 0, 0);
+                        mMediaExtractor.advance();
+                    }
 
-                            audioTrack.write(pcmBytes, 0, pcmBytes.length);
+                    int outputIndex = mMediaDecode.dequeueOutputBuffer(bufferInfo, 10 * 1000);
+                    ByteBuffer outBuffer;
+                    byte[] pcmBytes;
+                    while (outputIndex > 0) {
+                        outBuffer = mMediaDecode.getOutputBuffer(outputIndex);
+                        pcmBytes = new byte[bufferInfo.size];
+                        outBuffer.get(pcmBytes);
+                        outBuffer.clear();
 
-                            Message message = mHandler.obtainMessage();
-                            message.what = BYTES_HANDLER;
-                            message.obj = pcmBytes;
-                            message.arg1 = WAVE_VIEW;
-                            mHandler.sendMessage(message);
+                        audioTrack.write(pcmBytes, 0, pcmBytes.length);
 
-                            mMediaDecode.releaseOutputBuffer(outputIndex, false);
+                        Message message = mHandler.obtainMessage();
+                        message.what = BYTES_HANDLER;
+                        message.obj = pcmBytes;
+                        message.arg1 = WAVE_VIEW;
+                        mHandler.sendMessage(message);
 
-                            outputIndex = mMediaDecode.dequeueOutputBuffer(bufferInfo, 10 * 1000);
+                        mMediaDecode.releaseOutputBuffer(outputIndex, false);
 
-                        }
-
+                        outputIndex = mMediaDecode.dequeueOutputBuffer(bufferInfo, 10 * 1000);
 
                     }
+
+
                 }
                 audioTrack.stop();
                 audioTrack.release();
@@ -680,7 +692,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 设置音频保存路径，保存音频格式支持pcm、wav，设置路径为sd卡请注意WRITE_EXTERNAL_STORAGE权限
         // 注：AUDIO_FORMAT参数语记需要更新版本才能生效
-        mIse.setParameter(SpeechConstant.AUDIO_FORMAT,"wav");
+        mIse.setParameter(SpeechConstant.AUDIO_FORMAT, "wav");
         mIse.setParameter(SpeechConstant.ISE_AUDIO_PATH, Environment.getExternalStorageDirectory().getAbsolutePath() + "/msc/ise.wav");
         //通过writeaudio方式直接写入音频时才需要此设置
 //        mIse.setParameter(SpeechConstant.AUDIO_SOURCE,"-1");
